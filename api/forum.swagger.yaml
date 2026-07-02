@@ -1,0 +1,1176 @@
+openapi: 3.0.3
+info:
+  title: Mini Forum Service API
+  version: "1.0.0"
+  description: >-
+    Учебный сервис форума для отработки HTTP в Go:)
+
+
+    Основные цели:
+      - Практика реализации HTTP-обработчиков (`GET`/`POST`/`PUT`/`PATCH`/`DELETE`).
+      - Работа с различными источниками данных:
+          * **path-параметры** (например, `thread_id`, `attachment_id`),
+          * **query-параметры** (пагинация, фильтры, поиск),
+          * **заголовки** (`X-User-Id`, `X-Request-Id`),
+          * тела запросов в форматах `application/json`, `application/x-www-form-urlencoded`, `multipart/form-data`.
+      - Работа с файлами:
+          * **загрузка** (`multipart/form-data`),
+          * **скачивание** (байтовый ответ, не JSON).
+      - Отработка схем с `allOf` / `anyOf` / `oneOf` в OpenAPI:
+          * **allOf** — наследование общих полей (Thread, Post, расширенная ошибка),
+          * **anyOf** — частичное обновление ресурсов (`PATCH`),
+          * **oneOf** — гетерогенный список результатов поиска.
+      - Отработка единого формата ошибок (`ErrorResponse`) и различных кодов ответов.
+
+servers:
+  - url: http://localhost:8080
+    description: Локальный сервер для разработки
+
+tags:
+  - name: internal
+    description: Внутренние и служебные эндпоинты (health-check и т.п.).
+  - name: auth
+    description: Аутентификация и работа с сессиями.
+  - name: threads
+    description: Работа с тредами форума и постами внутри тредов.
+  - name: attachments
+    description: Работа с вложениями (метаданные и бинарные файлы, например, картинки).
+  - name: search
+    description: Поисковые эндпоинты по тредам и постам.
+
+components:
+  parameters:
+    UserIdHeader:
+      name: X-User-Id
+      in: header
+      description: >
+        Идентификатор пользователя. Для упрощения практики
+        передаётся в заголовке в качестве токена доступа.
+      required: true
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+        example: "550e8400-e29b-41d4-a716-446655440000"
+    OptionalUserIdHeader:
+      name: X-User-Id
+      in: header
+      description: Необязательный идентификатор пользователя.
+      required: false
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+        example: "550e8400-e29b-41d4-a716-446655440000"
+    RequestIdHeader:
+      name: X-Request-Id
+      in: header
+      description: Необязательный trace-id запроса для логирования и отладки.
+      required: false
+      schema:
+        type: string
+        example: "abcd123"
+    ThreadIdPath:
+      name: thread_id
+      in: path
+      required: true
+      description: Идентификатор треда.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+        example: 42
+    PostIdPath:
+      name: post_id
+      in: path
+      required: true
+      description: Идентификатор поста.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+        example: 10
+    AttachmentIdPath:
+      name: attachment_id
+      in: path
+      required: true
+      description: Идентификатор вложения.
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+        example: "550e8400-e29b-41d4-a716-446655440000"
+    IdempotencyKeyHeader:
+      name: X-Idempotency-Key
+      in: header
+      required: true
+      description: >-
+        Ключ идемпотентности. Повторный запрос с тем же X-Idempotency-Key
+        должен вернуть тот же результат, что и первый.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        
+  responses:
+    ErrorBadRequest:
+      description: Некорректный запрос (валидация, формат, отсутствующие параметры).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ErrorUnauthorized:
+      description: Требуется аутентификация или некорректный токен/заголовок пользователя.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ErrorForbidden:
+      description: Доступ к ресурсу запрещён для данного пользователя.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ErrorNotFound:
+      description: Ресурс не найден.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ErrorConflict:
+      description: Конфликт состояния (например, дубликат или устаревшая версия ресурса).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ErrorInternal:
+      description: Внутренняя ошибка сервера.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  securitySchemes:
+    user_id_auth:
+      type: apiKey
+      in: header
+      name: X-User-Id
+      description: >-
+        Упрощённая схема "авторизации" по заголовку.
+        Если endpoint требует `X-User-Id`, он помечен как защищённый
+        с помощью этой схемы.
+
+  schemas:
+    # Универсальный тип ошибки
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Код ошибки.
+          enum:
+            - validation_error       # Ошибка валидации входных данных
+            - bad_request            # Некорректный запрос, не проходящий парсинг / формат
+            - unauthorized           # Неавторизован / нет X-User-Id
+            - invalid_credentials    # Неверная пара логин/пароль
+            - forbidden              # Нет прав на операцию (не автор ресурса, тред залочен и т.п.)
+            - not_found              # Ресурс не найден
+            - internal_error         # Внутренняя ошибка сервера
+            - thread_locked          # Тред закрыт и не может быть изменён
+        message:
+          type: string
+          description: Человекочитаемое описание ошибки.
+          example: "invalid input"
+        details:
+          description: Дополнительные детали (любая структура).
+          type: object
+          additionalProperties: true
+          nullable: true
+
+    # Пример расширения ошибки через allOf
+    ErrorResponseExtended:
+      description: >
+        Пример использования allOf: базовый ErrorResponse плюс поле correlation_id
+        для сопоставления с логами и поддержкой.
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            correlation_id:
+              type: string
+              description: ID корреляции для поддержки/отладки.
+
+    PaginationMeta:
+      type: object
+      required:
+        - limit
+        - offset
+        - total
+      properties:
+        limit:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 100
+          example: 20
+        offset:
+          type: integer
+          format: int32
+          minimum: 0
+          example: 0
+        total:
+          type: integer
+          format: int64
+          example: 100
+
+    ThreadBase:
+      type: object
+      required:
+        - title
+        - content
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Заголовок треда
+          example: "как начать изучать go?"
+        content:
+          type: string
+          minLength: 1
+          maxLength: 10000
+          description: Контент треда
+          example: "подскажите хорошие ресурсы по языку go."
+        tags:
+          type: array
+          items:
+            type: string
+          example: ["go", "novice"]
+          description: Теги треда
+      description: Базовые поля треда.
+
+    ThreadCreate:
+      description: >
+        Данные для создания треда.
+        Использует allOf для наследования от ThreadBase.
+      allOf:
+        - $ref: '#/components/schemas/ThreadBase'
+        - type: object
+          required:
+            - title
+            - content
+
+    Thread:
+      description: >
+        Полная модель треда (пример использования allOf для объединения базовых и служебных полей).
+      allOf:
+        - $ref: '#/components/schemas/ThreadBase'
+        - type: object
+          required:
+            - id
+            - author_id
+            - created_at
+            - is_locked
+          properties:
+            id:
+              type: integer
+              format: int64
+              minimum: 1
+              example: 42
+            author_id:
+              type: string
+              format: uuid
+              pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+              example: "550e8400-e29b-41d4-a716-446655440000"
+            created_at:
+              type: string
+              format: date-time
+              description: Дата и время создания ресурса (UTC, RFC3339).
+              example: "2025-01-01T12:00:00Z"
+            updated_at:
+              type: string
+              format: date-time
+              description: >
+                Дата и время последнего обновления ресурса.
+                Отсутствует, если ресурс ещё ни разу не изменялся.
+                Поле отсутствует в ответе, если ресурс ещё не изменялся.
+              example: "2025-01-02T15:30:00Z"
+            is_locked:
+              type: boolean
+              description: >
+                Флаг блокировки треда. Если true — тред закрыт для изменений
+                (нельзя добавлять посты, редактировать или удалять).
+              default: false
+
+
+    # anyOf — для PATCH тела
+    ThreadPatch:
+      description: >
+        Тело PATCH для треда. Пример использования anyOf:
+        допускается изменение только одного типа поля за раз
+        (или title, или content, или tags).
+      anyOf:
+        - type: object
+          required: [title]
+          properties:
+            title:
+              type: string
+              minLength: 1
+              maxLength: 255
+              description: Новый заголовок треда
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: string
+              minLength: 1
+              maxLength: 10000
+              description: Новый контент треда
+        - type: object
+          required: [tags]
+          properties:
+            tags:
+              type: array
+              items:
+                type: string
+                minItems: 0
+                maxItems: 10
+                items:
+                  type: string
+                  minLength: 1
+                  maxLength: 32
+                description: Список тегов треда
+        - type: object
+          required: [is_locked]
+          properties:
+            is_locked:
+              type: boolean
+              description: >
+                Управление состоянием треда.
+                true — закрыть тред (запретить изменения и новые посты),
+                false — открыть тред.
+
+    PostBase:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          example: "рекомендую начать с leoscode.tech."
+      description: Базовые поля поста.
+
+    PostCreate:
+      description: Данные для создания поста.
+      allOf:
+        - $ref: '#/components/schemas/PostBase'
+        - type: object
+          required:
+            - content
+
+    Post:
+      description: >
+        Полная модель поста. Использует allOf для комбинации базовых полей и служебных полей.
+      allOf:
+        - $ref: '#/components/schemas/PostBase'
+        - type: object
+          required:
+            - id
+            - thread_id
+            - author_id
+            - created_at
+          properties:
+            id:
+              type: integer
+              format: int64
+              minimum: 1
+              example: 10
+            thread_id:
+              type: integer
+              format: int64
+              minimum: 1
+              example: 42
+            author_id:
+              type: string
+              format: uuid
+              pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+              example: "550e8400-e29b-41d4-a716-446655440000"
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+              nullable: true
+
+    Attachment:
+      type: object
+      required:
+        - id
+        - thread_id
+        - filename
+        - mime_type
+        - size
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        thread_id:
+          type: integer
+          format: int64
+          minimum: 1
+          example: 42
+        filename:
+          type: string
+          example: "image.png"
+        mime_type:
+          type: string
+          enum: [image/png, image/jpeg, image/gif, image/webp]
+          example: "image/png"
+        size:
+          type: integer
+          format: int64
+          description: >
+            Размер файла в байтах. Заполняется сервисом автоматически при загрузке
+            и не может быть отрицательным или равным нулю.
+            Используется для контроля ограничений размера вложений и отображения информации клиенту.
+          example: 102400
+        url:
+          type: string
+          format: uri
+          description: Публичный URL (если есть).
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    ThreadListResponse:
+      type: object
+      required:
+        - items
+        - meta
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Thread'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    PostListResponse:
+      type: object
+      required:
+        - items
+        - meta
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Post'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    # oneOf — элементы поиска
+    ThreadSearchResult:
+      description: Результат поиска по треду.
+      allOf:
+        - $ref: '#/components/schemas/Thread'
+        - type: object
+          properties:
+            highlight:
+              type: string
+              description: Текст с подсвеченным совпадением.
+              example: "...изучать **go**..."
+
+    PostSearchResult:
+      description: Результат поиска по посту.
+      allOf:
+        - $ref: '#/components/schemas/Post'
+        - type: object
+          properties:
+            thread_title:
+              type: string
+              example: "как начать изучать go?"
+
+    SearchResultItem:
+      description: >
+        Элемент результата поиска. Пример использования oneOf:
+        либо тред, либо пост.
+      oneOf:
+        - $ref: '#/components/schemas/ThreadSearchResult'
+        - $ref: '#/components/schemas/PostSearchResult'
+
+    SearchResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchResultItem'
+
+    LoginResponse:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+          description: >-
+            UUID идентификатор пользователя, который клиент должен
+            передавать в заголовке `X-User-Id` для защищённых методов.
+          example: "550e8400-e29b-41d4-a716-446655440000"
+
+    UploadAttachmentRequest:
+      description: >
+        Тело multipart/form-data для загрузки файла. Используется для практики работы
+        с файловым вводом через HTTP.
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+          description: >
+            Файл изображения (`image/png`, `image/jpeg`, `image/webp`).
+            MIME-type и имя файла валидируются сервисом после загрузки.
+        caption:
+          type: string
+          description: Подпись к картинке (хранится как метаданные).
+          minLength: 0
+          maxLength: 255
+          example: "Мой график нагрузки"
+      required:
+        - file
+
+paths:
+  /internal/v1/truncate:
+    post:
+      tags: [internal]
+      summary: Очистить БД (только для e2e/локальной разработки)
+      description: >
+        Удаляет все данные из базы.
+      operationId: internal_truncate
+      responses:
+        '204':
+          description: Truncated
+        '500':
+          $ref: '#/components/responses/ErrorInternal'
+  /internal/v1/health:
+    get:
+      tags: [internal]
+      summary: Проверка состояния сервиса.
+      description: >-
+        Health-check эндпоинт.
+
+        - Проверяет, что сервис доступен и корректно отвечает.
+
+        - Используется для readiness / liveness проб.
+
+        - **Если в запросе передан заголовок `X-Request-Id`,
+          сервер обязан вернуть этот же заголовок в ответе.**
+
+
+        Это упражнение предназначено для отработки:
+        - чтения заголовков запроса,
+        - установки заголовков в ответе.
+      operationId: health_check
+      parameters:
+        - $ref: '#/components/parameters/RequestIdHeader'
+      responses:
+        '200':
+          description: Сервис работает штатно.
+          headers:
+            X-Request-Id:
+              description: >
+                Echo заголовок. Если `X-Request-Id` был передан в запросе,
+                сервер обязан вернуть его в ответе без изменений.
+              schema:
+                type: string
+                example: "req_abc_123"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                    example: "ok"
+
+  /api/v1/auth/login:
+    post:
+      tags: [auth]
+      summary: Логин пользователя (form-urlencoded).
+      description: >-
+        Эндпоинт для тренировки:
+
+        - обработки `application/x-www-form-urlencoded` тела,
+
+        - базовой валидации входных данных,
+
+        - генерации и возврата токена в формате JSON,
+
+
+        **Упрощённая модель аутентификации для учебных целей**:
+        если пользователь с указанным `username` ещё не существует,
+        сервис должен создать его (упрощённая "регистрация") и вернуть новый `user_id`.
+        При повторном логине с тем же `username` должен возвращаться один и тот же `user_id`.
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  description: >
+                    Имя пользователя. Используется как логин и ключ для получения `user_id`.
+                    Разрешены латинские буквы, цифры и подчёркивание.
+                  minLength: 3
+                  maxLength: 32
+                  pattern: '^[a-zA-Z0-9_]+$'
+                  example: "golang_student_01"
+                password:
+                  type: string
+                  format: password
+                  description: >
+                    Пароль пользователя (в открытом виде, только для учебных целей).
+                    На практике пароли не должны храниться и передаваться в открытом виде!
+                  minLength: 8
+                  maxLength: 64
+                  example: "supersecret123"
+      responses:
+        '200':
+          description: Успешная аутентификация.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/ErrorBadRequest'
+        '401':
+          $ref: '#/components/responses/ErrorUnauthorized'
+        '500':
+          $ref: '#/components/responses/ErrorInternal'
+
+  /api/v1/threads:
+    get:
+      tags: [threads]
+      summary: Список тредов.
+      description: >-
+        Возвращает список тредов с поддержкой пагинации и фильтрации:
+
+        - тренировка чтения query-параметров (`limit`, `offset`, `tag`, `author_id`),
+
+        - формирование обёртки с полем meta для пагинации.
+      operationId: list_threads
+      parameters:
+        - $ref: '#/components/parameters/RequestIdHeader'
+        - name: limit
+          in: query
+          description: Размер страницы.
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          description: Смещение.
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 0
+            default: 0
+        - name: tag
+          in: query
+          description: Фильтр по тегу.
+          required: false
+          schema:
+            type: string
+        - name: author_id
+          in: query
+          description: Фильтр по идентификатору автора.
+          required: false
+          schema:
+            type: string
+            format: uuid
+            pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+            example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '200':
+          description: Список тредов.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreadListResponse'
+        '500':
+          $ref: '#/components/responses/ErrorInternal'
+
+    post:
+      tags: [threads]
+      summary: Создать новый тред.
+      description: >-
+        Создаёт новый тред:
+
+        - использует заголовок `X-User-Id` для определения автора,
+
+        - использует заголовок `X-Idempotency-Key` для дедубликации запроса,
+
+        - принимает тело в формате JSON (`ThreadCreate`),
+
+        - возвращает созданный тред и код **201**.
+
+
+        Идемпотентность:
+
+          - Сервер сохраняет результат первого успешного запроса для пары (`X-User-Id`, `X-Idempotency-Key`).
+
+          - Повторный запрос с теми же заголовками возвращает тот же тред без создания нового.
+
+          - Если `X-Idempotency-Key` совпал, но тело запроса отличается — возвращается `409 Conflict`.
+      operationId: create_thread
+      security:
+        - user_id_auth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThreadCreate'
+      responses:
+        '200':
+          description: >
+            Повторный запрос с тем же `X-Request-Id` и содержимым: возвращён уже созданный тред
+            (идемпотентный ответ).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thread'
+        '201':
+          description: Тред создан (первый успешный запрос с этим `X-Request-Id`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thread'
+        '400':
+          $ref: '#/components/responses/ErrorBadRequest'
+        '401':
+          $ref: '#/components/responses/ErrorUnauthorized'
+        '409':
+          description: >
+            Конфликт идемпотентности: `X-Request-Id` уже использовался,
+            но параметры запроса отличаются (например, другое тело ThreadCreate).
+          $ref: '#/components/responses/ErrorConflict'
+        '500':
+          $ref: '#/components/responses/ErrorInternal'
+
+  /api/v1/threads/{thread_id}:
+    get:
+      tags: [threads]
+      summary: Получить тред по ID.
+      description: >-
+        Возвращает тред по его идентификатору:
+
+        - демонстрирует работу с path-параметром `thread_id`.
+      operationId: get_thread
+      parameters:
+        - $ref: '#/components/parameters/ThreadIdPath'
+        - $ref: '#/components/parameters/OptionalUserIdHeader'
+      responses:
+        '200':
+          description: Тред найден.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thread'
+        '404':
+          $ref: '#/components/responses/ErrorNotFound'
+        '500':
+          $ref: '#/components/responses/ErrorInternal'
+
+    put:
+      tags: [threads]
+      summary: Полностью заменить тред.
+      description: >-
+        Идемпотентная операция полной замены треда:
+
+        - тренировочный пример для **PUT**,
+
+        - требует полного набора полей тела (`ThreadCreate`),
+
+        - использует `X-User-Id` для проверки прав.
+      operationId: replace_thread
+      security:
+        - user_id_auth: []
+      parameters:
+        - $ref: '#/components/parameters/ThreadIdPath'
+        - $ref: '#/components/parameters/UserIdHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThreadCreate'
+      responses:
+        '200':
+          description: Тред заменён.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thread'
+        '400':
+          $ref: '#/components/responses/ErrorBadRequest'
+        '401':
+          $ref: '#/components/responses/ErrorUnauthorized'
+        '403':
+          $ref: '#/components/responses/ErrorForbidden'
+        '404':
+          $ref: '#/components/responses/ErrorNotFound'
+        '500':
+          $ref: '#/components/responses/ErrorInternal'
+
+    patch:
+      tags: [threads]
+      summary: Частично обновить тред.
+      description: >-
+        Частичное обновление треда:
+
+        - демонстрирует использование **anyOf** в схеме `ThreadPatch`,
+
+        - позволяет менять отдельные поля (`title`, `content`, `tags` и `is_locked`),
+
+        - полезно для отработки **PATCH** и обработки JSON-паттернов.
+      operationId: patch_thread
+      security:
+        - user_id_auth: []
+      parameters:
+        - $ref: '#/components/parameters/ThreadIdPath'
+        - $ref: '#/components/parameters/UserIdHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThreadPatch'
+      responses:
+        '200':
+          description: Тред обновлён.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thread'
+        '400':
+          $ref: '#/components/responses/ErrorBadRequest'
+        '401':
+          $ref: '#/components/responses/ErrorUnauthorized'
+        '403':
+          description: Тред закрыт и не может быть изменён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: thread_locked
+                message: Нельзя редактировать закрытый тред
+        '404':
+          $ref: '#/components/responses/ErrorNotFound'
+        '500':
+          $ref: '#/components/responses/ErrorInternal'
+
+    delete:
+      tags: [threads]
+      summary: Удалить тред.
+      description: >-
+        Удаляет тред по ID:
+
+        - пример использования **DELETE**,
+
+        - возвращает только статус **204** без тела.
+      operationId: delete_thread
+      security:
+        - user_id_auth: []
+      parameters:
+        - $ref: '#/components/parameters/ThreadIdPath'
+        - $ref: '#/components/parameters/UserIdHeader'
+      responses:
+        '204':
+          description: Тред удалён.
+        '401':
+          $ref: '#/components/responses/ErrorUnauthorized'
+        '404':
+          $ref: '#/components/responses/ErrorNotFound'
+        '500':
+          $ref: '#/components/responses/ErrorInternal'
+
+  /api/v1/threads/{thread_id}/posts:
+    get:
+      tags: [threads]
+      summary: Список постов в треде.
+      description: >-
+        Возвращает посты внутри указанного треда:
+
+        - тренировка сочетания path-параметра (`thread_id`) и query-параметров (`limit`, `offset`),
+
+        - структура ответа аналогична `ThreadListResponse`.
+      operationId: list_posts
+      parameters:
+        - $ref: '#/components/parameters/ThreadIdPath'
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Список постов.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostListResponse'
+        '404':
+          $ref: '#/components/responses/ErrorNotFound'
+        '500':
+          $ref: '#/components/responses/ErrorInternal'
+
+    post:
+      tags: [threads]
+      summary: Создать пост в треде.
+      description: >
+        Добавляет новый пост в существующий тред:
+
+        - использует `X-User-Id` для указания автора,
+
+        - использует заголовок `X-Idempotency-Key` для дедубликации запроса,
+
+        - принимает JSON-тело `PostCreate`,
+
+        - возвращает созданный пост.
+
+        Идемпотентность:
+
+        - Сервер сохраняет результат первого успешного запроса для пары (`X-User-Id`, `X-Idempotency-Key`).
+
+        - Повторный запрос с теми же заголовками возвращает тот же пост без создания нового.
+
+        - Если `X-Idempotency-Key` совпал, но тело запроса отличается — возвращается `409 Conflict`.
+      operationId: create_post
+      security:
+        - user_id_auth: []
+      parameters:
+        - $ref: '#/components/parameters/ThreadIdPath'
+        - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCreate'
+      responses:
+        '200':
+          description: >
+            Повторный запрос с тем же `X-Request-Id` и содержимым: возвращён уже созданный пост
+            (идемпотентный ответ).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '201':
+          description: Пост создан.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '400':
+          $ref: '#/components/responses/ErrorBadRequest'
+        '401':
+          $ref: '#/components/responses/ErrorUnauthorized'
+        '403':
+          description: Нельзя добавлять посты в закрытый тред
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: thread_locked
+                message: Нельзя добавлять посты в закрытый тред
+        '404':
+          $ref: '#/components/responses/ErrorNotFound'
+        '409':
+          description: >
+            Конфликт идемпотентности: `X-Request-Id` уже использовался,
+            но параметры запроса отличаются (например, другое тело ThreadCreate).
+          $ref: '#/components/responses/ErrorConflict'
+        '500':
+          $ref: '#/components/responses/ErrorInternal'
+
+  /api/v1/threads/{thread_id}/attachments:
+    post:
+      tags: [attachments]
+      summary: Загрузить вложение (картинку) к треду.
+      description: >-
+        Пример работы с файлами и `multipart/form-data`:
+
+        - читает файл из поля form-data "file",
+
+        - опционально принимает подпись caption,
+
+        - создаёт сущность Attachment, связанную с **thread_id**.
+      operationId: upload_attachment
+      security:
+        - user_id_auth: []
+      parameters:
+        - $ref: '#/components/parameters/ThreadIdPath'
+        - $ref: '#/components/parameters/UserIdHeader'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadAttachmentRequest'
+      responses:
+        '201':
+          description: Вложение создано.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attachment'
+        '400':
+          $ref: '#/components/responses/ErrorBadRequest'
+        '401':
+          $ref: '#/components/responses/ErrorUnauthorized'
+        '404':
+          $ref: '#/components/responses/ErrorNotFound'
+        '500':
+          $ref: '#/components/responses/ErrorInternal'
+
+  /api/v1/attachments/{attachment_id}:
+    get:
+      tags: [attachments]
+      summary: Получить метаданные вложения.
+      description: >-
+        Возвращает JSON-метаданные вложения:
+
+        - тренировка чтения path-параметра `attachment_id`,
+
+        - демонстрирует модель `Attachment`.
+      operationId: get_attachment
+      parameters:
+        - $ref: '#/components/parameters/AttachmentIdPath'
+      responses:
+        '200':
+          description: Метаданные вложения.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attachment'
+        '404':
+          $ref: '#/components/responses/ErrorNotFound'
+        '500':
+          $ref: '#/components/responses/ErrorInternal'
+
+  /api/v1/attachments/{attachment_id}/file:
+    get:
+      tags: [attachments]
+      summary: Скачать файл вложения.
+      description: >-
+        Один из двух основных методов работы с файлами:
+
+        - возвращает бинарные данные файла (`image/*`),
+
+        - НЕ возвращает JSON (исключение из общего правила),
+
+        - можно использовать для тренировки установки корректного `Content-Type`.
+      operationId: download_attachment_file
+      parameters:
+        - $ref: '#/components/parameters/AttachmentIdPath'
+      responses:
+        '200':
+          description: Файл вложения.
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/ErrorNotFound'
+        '500':
+          $ref: '#/components/responses/ErrorInternal'
+
+  /api/v1/search:
+    get:
+      tags: [search]
+      summary: Поиск по тредам и постам.
+      description: >-
+        Поиск по содержимому форума:
+
+        - использует query-параметр `search_query` (строка поиска),
+
+        - параметр type задаёт тип сущности для фильтрации (`thread`/`post`/`all`),
+        
+        - в ответе используется **oneOf** (`ThreadSearchResult` или `PostSearchResult`),
+          что позволяет отработать разбор гетерогенных JSON-объектов.
+      operationId: search
+      parameters:
+        - name: search_query
+          in: query
+          required: true
+          description: >
+            Поисковой запрос. Должен быть непустой строкой длиной от 1 до 1024 символов.
+            Используется для полнотекстового поиска по тредам и постам.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 1024
+            example: "golang"
+        - name: type
+          in: query
+          required: false
+          description: Ограничить поиск сущностью.
+          schema:
+            type: string
+            enum: [thread, post, all]
+            default: all
+      responses:
+        '200':
+          description: Результаты поиска.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          $ref: '#/components/responses/ErrorBadRequest'
+        '500':
+          $ref: '#/components/responses/ErrorInternal'
