@@ -6,6 +6,7 @@ type AuthService struct {
 	users map[string]string
 }
 
+
 func NewAuthService() *AuthService {
 	return &AuthService{
 		users: make(map[string]string),
