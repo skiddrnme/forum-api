@@ -12,12 +12,14 @@ func main() {
 	authService := service.NewAuthService()
 	authHandler := handlers.NewAuthHandler(authService)
 
-	threadsService := service.NewThreadService()
+	threadService := service.NewThreadService()
+	threadHandler := handlers.NewThreadHandler(threadService)
 
 
 	r.GET("/internal/v1/health", handlers.Health)
-	r.GET("/api/v1/threads", handlers.GetThreads)
 
+	r.POST("/api/v1/threads", threadHandler.Create)
+	
 	r.POST("/api/v1/auth/login", authHandler.Login)
 
 	r.Run(":8080")

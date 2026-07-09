@@ -30,7 +30,7 @@ func (h *AuthHandler) Login(c *gin.Context){
 
 	id, err := h.authService.Login(username, password)
 	if err != nil{
-		fmt.Println("Ошибка")
+		fmt.Println("Ошибка", err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{

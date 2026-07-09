@@ -5,6 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+
 func Health(c *gin.Context) {
 	reqID := c.GetHeader("X-Request-Id")
 	if reqID != "" {
@@ -14,5 +15,7 @@ func Health(c *gin.Context) {
 		"status": "ok",
 		"reqID": reqID,
 	})
+
+	
 	
 }
