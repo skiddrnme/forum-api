@@ -18,6 +18,7 @@ func main() {
 
 	r.GET("/internal/v1/health", handlers.Health)
 
+	r.GET("/api/v1/threads", threadHandler.GetThreads)
 	r.POST("/api/v1/threads", threadHandler.Create)
 	
 	r.POST("/api/v1/auth/login", authHandler.Login)

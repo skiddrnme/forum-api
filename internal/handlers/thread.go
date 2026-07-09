@@ -19,6 +19,17 @@ func NewThreadHandler(threadService *service.ThreadService) *ThreadHandler {
 	}
 }
 
+func (t *ThreadHandler) GetThreads(c *gin.Context){
+	threads, err := t.threadService.GetThreads()
+	if err != nil{
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    "bad_request",
+			"message": err.Error(),
+		})
+	}
+	c.JSON(http.StatusOK, threads)
+}
+
 func (t *ThreadHandler) Create(c *gin.Context) {
 	// 1. Получаем userID
 	userID := c.GetHeader("X-User-Id")
