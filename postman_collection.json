@@ -1,0 +1,414 @@
+{
+  "info": {
+    "name": "Forum API Tests",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Setup",
+      "item": [
+        {
+          "name": "Login - Get User ID",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "test_user_1",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "password123",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/auth/login",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "v1", "auth", "login"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Threads - Create",
+      "item": [
+        {
+          "name": "Create Thread #1 - Go Backend",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "550e8400-e29b-41d4-a716-446655440000"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "create-thread-001"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Как начать изучать Go в 2024?\",\n  \"content\": \"Привет, сообщество! Хочу начать изучать Go. Посоветуйте лучшие ресурсы, книги и курсы для начинающих. Интересно узнать про особенности языка, где его применяют и какие есть перспективы.\",\n  \"tags\": [\"go\", \"backend\", \"learning\"]\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/threads",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "v1", "threads"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Thread #2 - Python Django",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "550e8400-e29b-41d4-a716-446655440000"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "create-thread-002"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Django vs FastAPI: что выбрать для бэкенда?\",\n  \"content\": \"Разрабатываю новый проект и не могу выбрать между Django и FastAPI. Django кажется более монолитным и тяжелым, а FastAPI - быстрым и современным. У кого какой опыт использования?\",\n  \"tags\": [\"python\", \"django\", \"fastapi\", \"backend\"]\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/threads",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "v1", "threads"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Thread #3 - JavaScript Frontend",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "550e8400-e29b-41d4-a716-446655440000"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "create-thread-003"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Современный фронтенд: React, Vue или Svelte?\",\n  \"content\": \"Стоит ли переходить на Svelte, если уже есть опыт работы с React? Вижу много хайпа вокруг Svelte, но не уверен, что он готов для больших проектов. Поделитесь опытом!\",\n  \"tags\": [\"javascript\", \"react\", \"vue\", \"svelte\", \"frontend\"]\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/threads",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "v1", "threads"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Thread #4 - Docker DevOps",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "550e8400-e29b-41d4-a716-446655440000"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "create-thread-004"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Docker и Kubernetes: с чего начать?\",\n  \"content\": \"Хочу освоить Docker и Kubernetes для деплоя приложений. Посоветуйте хорошие учебные материалы и практические проекты для начала. Есть ли смысл учить Docker Swarm или сразу идти в Kubernetes?\",\n  \"tags\": [\"docker\", \"kubernetes\", \"devops\", \"cloud\"]\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/threads",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "v1", "threads"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Thread #5 - Clean Architecture",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "550e8400-e29b-41d4-a716-446655440000"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "create-thread-005"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Clean Architecture vs Hexagonal Architecture\",\n  \"content\": \"Изучаю различные архитектурные паттерны. Clean Architecture от Robert Martin кажется интересным, но слышал про Hexagonal Architecture. В чем разница и когда что использовать?\",\n  \"tags\": [\"architecture\", \"design-patterns\", \"clean-architecture\", \"ddd\"]\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/threads",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "v1", "threads"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Thread #6 - Database PostgreSQL",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "550e8400-e29b-41d4-a716-446655440000"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "create-thread-006"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"PostgreSQL: оптимизация запросов и индексы\",\n  \"content\": \"База данных стала медленно работать на больших объемах данных. Посоветуйте инструменты для анализа и оптимизации запросов. Когда использовать GIN индекс для JSONB?\",\n  \"tags\": [\"postgresql\", \"database\", \"sql\", \"optimization\"]\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/threads",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "v1", "threads"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Threads - Get All",
+      "item": [
+        {
+          "name": "Get All Threads (default)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Request-Id",
+                "value": "test-request-001"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/v1/threads",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "v1", "threads"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Threads - Filter by Tag 'go'",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/v1/threads?tag=go",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "v1", "threads"],
+              "query": [
+                {
+                  "key": "tag",
+                  "value": "go"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Threads - Filter by Tag 'backend'",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/v1/threads?tag=backend",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "v1", "threads"],
+              "query": [
+                {
+                  "key": "tag",
+                  "value": "backend"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Threads - Pagination (limit=2)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/v1/threads?limit=2&offset=0",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "v1", "threads"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "2"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Threads - Pagination (limit=2, offset=2)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/v1/threads?limit=2&offset=2",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "v1", "threads"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "2"
+                },
+                {
+                  "key": "offset",
+                  "value": "2"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Threads - Filter by Author",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/v1/threads?author_id=550e8400-e29b-41d4-a716-446655440000",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "v1", "threads"],
+              "query": [
+                {
+                  "key": "author_id",
+                  "value": "550e8400-e29b-41d4-a716-446655440000"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Threads - Get By ID",
+      "item": [
+        {
+          "name": "Get Thread by ID (replace :id with actual ID)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "550e8400-e29b-41d4-a716-446655440000"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/v1/threads/1",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "v1", "threads", "1"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    }
+  ]
+}

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -19,16 +20,72 @@ func NewThreadHandler(threadService *service.ThreadService) *ThreadHandler {
 	}
 }
 
-func (t *ThreadHandler) GetThreads(c *gin.Context){
-	threads, err := t.threadService.GetThreads()
-	if err != nil{
+func (t *ThreadHandler) GetThreads(c *gin.Context) {
+	limitStr := c.DefaultQuery("limit", "20")
+	offsetStr := c.DefaultQuery("offset", "0")
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 || limit > 100 {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    "bad_request",
+			"code":    "validation_error",
+			"message": "limit must be between 1 and 100",
+		})
+		return
+	}
+
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    "validation_error",
+			"message": "offset must be >= 0",
+		})
+		return
+	}
+
+	tag := c.Query("tag")
+	authorID := c.Query("author_id")
+
+	if authorID != "" {
+		if _, err := uuid.Parse(authorID); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"code":    "validation_error",
+				"message": "invalid author_id format",
+			})
+			return
+		}
+	}
+
+	threads, err := t.threadService.GetThreadsWithMeta(limit, offset, tag, authorID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    "internal_server",
 			"message": err.Error(),
 		})
+		return
 	}
+
 	c.JSON(http.StatusOK, threads)
 }
+
+func (t *ThreadHandler) GetThreadByID(c *gin.Context){
+	// Получаем thread_id из path параметров
+	id := c.Param("thread_id")
+
+	thread, err := t.threadService.GetThreadByID(id)
+	if err != nil{
+		c.JSON(http.StatusNotFound, gin.H{
+			"code": "not_found",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Тред найден",
+		"item": thread,
+	})
+}
+
 
 func (t *ThreadHandler) Create(c *gin.Context) {
 	// 1. Получаем userID
