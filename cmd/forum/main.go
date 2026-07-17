@@ -20,8 +20,13 @@ func main() {
 
 	r.GET("/api/v1/threads", threadHandler.GetThreads)
 	r.GET("/api/v1/threads/:thread_id", threadHandler.GetThreadByID)
-	r.POST("/api/v1/threads", threadHandler.Create)
 	
+	r.POST("/api/v1/threads", threadHandler.Create)
+
+	r.PUT("/api/v1/threads/:thread_id", threadHandler.UpdateAll)
+	
+	r.PATCH("/api/v1/threads/:thread_id", )
+
 	r.POST("/api/v1/auth/login", authHandler.Login)
 
 	r.Run(":8080")

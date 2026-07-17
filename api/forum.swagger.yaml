@@ -50,7 +50,7 @@ components:
       schema:
         type: string
         format: uuid
-        pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+        pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         example: "550e8400-e29b-41d4-a716-446655440000"
     OptionalUserIdHeader:
       name: X-User-Id
@@ -60,7 +60,7 @@ components:
       schema:
         type: string
         format: uuid
-        pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+        pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         example: "550e8400-e29b-41d4-a716-446655440000"
     RequestIdHeader:
       name: X-Request-Id
@@ -98,7 +98,7 @@ components:
       schema:
         type: string
         format: uuid
-        pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+        pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         example: "550e8400-e29b-41d4-a716-446655440000"
     IdempotencyKeyHeader:
       name: X-Idempotency-Key
@@ -111,44 +111,44 @@ components:
         type: string
         minLength: 1
         maxLength: 128
-        
+
   responses:
     ErrorBadRequest:
       description: Некорректный запрос (валидация, формат, отсутствующие параметры).
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
     ErrorUnauthorized:
       description: Требуется аутентификация или некорректный токен/заголовок пользователя.
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
     ErrorForbidden:
       description: Доступ к ресурсу запрещён для данного пользователя.
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
     ErrorNotFound:
       description: Ресурс не найден.
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
     ErrorConflict:
       description: Конфликт состояния (например, дубликат или устаревшая версия ресурса).
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
     ErrorInternal:
       description: Внутренняя ошибка сервера.
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
 
   securitySchemes:
     user_id_auth:
@@ -172,14 +172,14 @@ components:
           type: string
           description: Код ошибки.
           enum:
-            - validation_error       # Ошибка валидации входных данных
-            - bad_request            # Некорректный запрос, не проходящий парсинг / формат
-            - unauthorized           # Неавторизован / нет X-User-Id
-            - invalid_credentials    # Неверная пара логин/пароль
-            - forbidden              # Нет прав на операцию (не автор ресурса, тред залочен и т.п.)
-            - not_found              # Ресурс не найден
-            - internal_error         # Внутренняя ошибка сервера
-            - thread_locked          # Тред закрыт и не может быть изменён
+            - validation_error # Ошибка валидации входных данных
+            - bad_request # Некорректный запрос, не проходящий парсинг / формат
+            - unauthorized # Неавторизован / нет X-User-Id
+            - invalid_credentials # Неверная пара логин/пароль
+            - forbidden # Нет прав на операцию (не автор ресурса, тред залочен и т.п.)
+            - not_found # Ресурс не найден
+            - internal_error # Внутренняя ошибка сервера
+            - thread_locked # Тред закрыт и не может быть изменён
         message:
           type: string
           description: Человекочитаемое описание ошибки.
@@ -196,7 +196,7 @@ components:
         Пример использования allOf: базовый ErrorResponse плюс поле correlation_id
         для сопоставления с логами и поддержкой.
       allOf:
-        - $ref: '#/components/schemas/ErrorResponse'
+        - $ref: "#/components/schemas/ErrorResponse"
         - type: object
           properties:
             correlation_id:
@@ -257,7 +257,7 @@ components:
         Данные для создания треда.
         Использует allOf для наследования от ThreadBase.
       allOf:
-        - $ref: '#/components/schemas/ThreadBase'
+        - $ref: "#/components/schemas/ThreadBase"
         - type: object
           required:
             - title
@@ -267,7 +267,7 @@ components:
       description: >
         Полная модель треда (пример использования allOf для объединения базовых и служебных полей).
       allOf:
-        - $ref: '#/components/schemas/ThreadBase'
+        - $ref: "#/components/schemas/ThreadBase"
         - type: object
           required:
             - id
@@ -283,7 +283,7 @@ components:
             author_id:
               type: string
               format: uuid
-              pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+              pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
               example: "550e8400-e29b-41d4-a716-446655440000"
             created_at:
               type: string
@@ -304,7 +304,6 @@ components:
                 Флаг блокировки треда. Если true — тред закрыт для изменений
                 (нельзя добавлять посты, редактировать или удалять).
               default: false
-
 
     # anyOf — для PATCH тела
     ThreadPatch:
@@ -366,7 +365,7 @@ components:
     PostCreate:
       description: Данные для создания поста.
       allOf:
-        - $ref: '#/components/schemas/PostBase'
+        - $ref: "#/components/schemas/PostBase"
         - type: object
           required:
             - content
@@ -375,7 +374,7 @@ components:
       description: >
         Полная модель поста. Использует allOf для комбинации базовых полей и служебных полей.
       allOf:
-        - $ref: '#/components/schemas/PostBase'
+        - $ref: "#/components/schemas/PostBase"
         - type: object
           required:
             - id
@@ -396,7 +395,7 @@ components:
             author_id:
               type: string
               format: uuid
-              pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+              pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
               example: "550e8400-e29b-41d4-a716-446655440000"
             created_at:
               type: string
@@ -419,7 +418,7 @@ components:
         id:
           type: string
           format: uuid
-          pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+          pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
           example: "550e8400-e29b-41d4-a716-446655440000"
         thread_id:
           type: integer
@@ -459,9 +458,9 @@ components:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/Thread'
+            $ref: "#/components/schemas/Thread"
         meta:
-          $ref: '#/components/schemas/PaginationMeta'
+          $ref: "#/components/schemas/PaginationMeta"
 
     PostListResponse:
       type: object
@@ -472,15 +471,15 @@ components:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/Post'
+            $ref: "#/components/schemas/Post"
         meta:
-          $ref: '#/components/schemas/PaginationMeta'
+          $ref: "#/components/schemas/PaginationMeta"
 
     # oneOf — элементы поиска
     ThreadSearchResult:
       description: Результат поиска по треду.
       allOf:
-        - $ref: '#/components/schemas/Thread'
+        - $ref: "#/components/schemas/Thread"
         - type: object
           properties:
             highlight:
@@ -491,7 +490,7 @@ components:
     PostSearchResult:
       description: Результат поиска по посту.
       allOf:
-        - $ref: '#/components/schemas/Post'
+        - $ref: "#/components/schemas/Post"
         - type: object
           properties:
             thread_title:
@@ -503,8 +502,8 @@ components:
         Элемент результата поиска. Пример использования oneOf:
         либо тред, либо пост.
       oneOf:
-        - $ref: '#/components/schemas/ThreadSearchResult'
-        - $ref: '#/components/schemas/PostSearchResult'
+        - $ref: "#/components/schemas/ThreadSearchResult"
+        - $ref: "#/components/schemas/PostSearchResult"
 
     SearchResponse:
       type: object
@@ -512,7 +511,7 @@ components:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/SearchResultItem'
+            $ref: "#/components/schemas/SearchResultItem"
 
     LoginResponse:
       type: object
@@ -522,7 +521,7 @@ components:
         user_id:
           type: string
           format: uuid
-          pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+          pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
           description: >-
             UUID идентификатор пользователя, который клиент должен
             передавать в заголовке `X-User-Id` для защищённых методов.
@@ -558,10 +557,10 @@ paths:
         Удаляет все данные из базы.
       operationId: internal_truncate
       responses:
-        '204':
+        "204":
           description: Truncated
-        '500':
-          $ref: '#/components/responses/ErrorInternal'
+        "500":
+          $ref: "#/components/responses/ErrorInternal"
   /internal/v1/health:
     get:
       tags: [internal]
@@ -582,9 +581,9 @@ paths:
         - установки заголовков в ответе.
       operationId: health_check
       parameters:
-        - $ref: '#/components/parameters/RequestIdHeader'
+        - $ref: "#/components/parameters/RequestIdHeader"
       responses:
-        '200':
+        "200":
           description: Сервис работает штатно.
           headers:
             X-Request-Id:
@@ -641,7 +640,7 @@ paths:
                     Разрешены латинские буквы, цифры и подчёркивание.
                   minLength: 3
                   maxLength: 32
-                  pattern: '^[a-zA-Z0-9_]+$'
+                  pattern: "^[a-zA-Z0-9_]+$"
                   example: "golang_student_01"
                 password:
                   type: string
@@ -653,18 +652,18 @@ paths:
                   maxLength: 64
                   example: "supersecret123"
       responses:
-        '200':
+        "200":
           description: Успешная аутентификация.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LoginResponse'
-        '400':
-          $ref: '#/components/responses/ErrorBadRequest'
-        '401':
-          $ref: '#/components/responses/ErrorUnauthorized'
-        '500':
-          $ref: '#/components/responses/ErrorInternal'
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/ErrorBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrorUnauthorized"
+        "500":
+          $ref: "#/components/responses/ErrorInternal"
 
   /api/v1/threads:
     get:
@@ -678,7 +677,7 @@ paths:
         - формирование обёртки с полем meta для пагинации.
       operationId: list_threads
       parameters:
-        - $ref: '#/components/parameters/RequestIdHeader'
+        - $ref: "#/components/parameters/RequestIdHeader"
         - name: limit
           in: query
           description: Размер страницы.
@@ -711,17 +710,17 @@ paths:
           schema:
             type: string
             format: uuid
-            pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+            pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
             example: "550e8400-e29b-41d4-a716-446655440000"
       responses:
-        '200':
+        "200":
           description: Список тредов.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ThreadListResponse'
-        '500':
-          $ref: '#/components/responses/ErrorInternal'
+                $ref: "#/components/schemas/ThreadListResponse"
+        "500":
+          $ref: "#/components/responses/ErrorInternal"
 
     post:
       tags: [threads]
@@ -749,40 +748,40 @@ paths:
       security:
         - user_id_auth: []
       parameters:
-        - $ref: '#/components/parameters/UserIdHeader'
-        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+        - $ref: "#/components/parameters/UserIdHeader"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ThreadCreate'
+              $ref: "#/components/schemas/ThreadCreate"
       responses:
-        '200':
+        "200":
           description: >
             Повторный запрос с тем же `X-Request-Id` и содержимым: возвращён уже созданный тред
             (идемпотентный ответ).
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Thread'
-        '201':
+                $ref: "#/components/schemas/Thread"
+        "201":
           description: Тред создан (первый успешный запрос с этим `X-Request-Id`).
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Thread'
-        '400':
-          $ref: '#/components/responses/ErrorBadRequest'
-        '401':
-          $ref: '#/components/responses/ErrorUnauthorized'
-        '409':
+                $ref: "#/components/schemas/Thread"
+        "400":
+          $ref: "#/components/responses/ErrorBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrorUnauthorized"
+        "409":
           description: >
             Конфликт идемпотентности: `X-Request-Id` уже использовался,
             но параметры запроса отличаются (например, другое тело ThreadCreate).
-          $ref: '#/components/responses/ErrorConflict'
-        '500':
-          $ref: '#/components/responses/ErrorInternal'
+          $ref: "#/components/responses/ErrorConflict"
+        "500":
+          $ref: "#/components/responses/ErrorInternal"
 
   /api/v1/threads/{thread_id}:
     get:
@@ -794,19 +793,19 @@ paths:
         - демонстрирует работу с path-параметром `thread_id`.
       operationId: get_thread
       parameters:
-        - $ref: '#/components/parameters/ThreadIdPath'
-        - $ref: '#/components/parameters/OptionalUserIdHeader'
+        - $ref: "#/components/parameters/ThreadIdPath"
+        - $ref: "#/components/parameters/OptionalUserIdHeader"
       responses:
-        '200':
+        "200":
           description: Тред найден.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Thread'
-        '404':
-          $ref: '#/components/responses/ErrorNotFound'
-        '500':
-          $ref: '#/components/responses/ErrorInternal'
+                $ref: "#/components/schemas/Thread"
+        "404":
+          $ref: "#/components/responses/ErrorNotFound"
+        "500":
+          $ref: "#/components/responses/ErrorInternal"
 
     put:
       tags: [threads]
@@ -823,31 +822,31 @@ paths:
       security:
         - user_id_auth: []
       parameters:
-        - $ref: '#/components/parameters/ThreadIdPath'
-        - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: "#/components/parameters/ThreadIdPath"
+        - $ref: "#/components/parameters/UserIdHeader"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ThreadCreate'
+              $ref: "#/components/schemas/ThreadCreate"
       responses:
-        '200':
+        "200":
           description: Тред заменён.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Thread'
-        '400':
-          $ref: '#/components/responses/ErrorBadRequest'
-        '401':
-          $ref: '#/components/responses/ErrorUnauthorized'
-        '403':
-          $ref: '#/components/responses/ErrorForbidden'
-        '404':
-          $ref: '#/components/responses/ErrorNotFound'
-        '500':
-          $ref: '#/components/responses/ErrorInternal'
+                $ref: "#/components/schemas/Thread"
+        "400":
+          $ref: "#/components/responses/ErrorBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrorUnauthorized"
+        "403":
+          $ref: "#/components/responses/ErrorForbidden"
+        "404":
+          $ref: "#/components/responses/ErrorNotFound"
+        "500":
+          $ref: "#/components/responses/ErrorInternal"
 
     patch:
       tags: [threads]
@@ -864,38 +863,38 @@ paths:
       security:
         - user_id_auth: []
       parameters:
-        - $ref: '#/components/parameters/ThreadIdPath'
-        - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: "#/components/parameters/ThreadIdPath"
+        - $ref: "#/components/parameters/UserIdHeader"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ThreadPatch'
+              $ref: "#/components/schemas/ThreadPatch"
       responses:
-        '200':
+        "200":
           description: Тред обновлён.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Thread'
-        '400':
-          $ref: '#/components/responses/ErrorBadRequest'
-        '401':
-          $ref: '#/components/responses/ErrorUnauthorized'
-        '403':
+                $ref: "#/components/schemas/Thread"
+        "400":
+          $ref: "#/components/responses/ErrorBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrorUnauthorized"
+        "403":
           description: Тред закрыт и не может быть изменён
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
               example:
                 code: thread_locked
                 message: Нельзя редактировать закрытый тред
-        '404':
-          $ref: '#/components/responses/ErrorNotFound'
-        '500':
-          $ref: '#/components/responses/ErrorInternal'
+        "404":
+          $ref: "#/components/responses/ErrorNotFound"
+        "500":
+          $ref: "#/components/responses/ErrorInternal"
 
     delete:
       tags: [threads]
@@ -910,17 +909,17 @@ paths:
       security:
         - user_id_auth: []
       parameters:
-        - $ref: '#/components/parameters/ThreadIdPath'
-        - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: "#/components/parameters/ThreadIdPath"
+        - $ref: "#/components/parameters/UserIdHeader"
       responses:
-        '204':
+        "204":
           description: Тред удалён.
-        '401':
-          $ref: '#/components/responses/ErrorUnauthorized'
-        '404':
-          $ref: '#/components/responses/ErrorNotFound'
-        '500':
-          $ref: '#/components/responses/ErrorInternal'
+        "401":
+          $ref: "#/components/responses/ErrorUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrorNotFound"
+        "500":
+          $ref: "#/components/responses/ErrorInternal"
 
   /api/v1/threads/{thread_id}/posts:
     get:
@@ -934,7 +933,7 @@ paths:
         - структура ответа аналогична `ThreadListResponse`.
       operationId: list_posts
       parameters:
-        - $ref: '#/components/parameters/ThreadIdPath'
+        - $ref: "#/components/parameters/ThreadIdPath"
         - name: limit
           in: query
           required: false
@@ -953,16 +952,16 @@ paths:
             minimum: 0
             default: 0
       responses:
-        '200':
+        "200":
           description: Список постов.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PostListResponse'
-        '404':
-          $ref: '#/components/responses/ErrorNotFound'
-        '500':
-          $ref: '#/components/responses/ErrorInternal'
+                $ref: "#/components/schemas/PostListResponse"
+        "404":
+          $ref: "#/components/responses/ErrorNotFound"
+        "500":
+          $ref: "#/components/responses/ErrorInternal"
 
     post:
       tags: [threads]
@@ -989,52 +988,52 @@ paths:
       security:
         - user_id_auth: []
       parameters:
-        - $ref: '#/components/parameters/ThreadIdPath'
-        - $ref: '#/components/parameters/UserIdHeader'
-        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+        - $ref: "#/components/parameters/ThreadIdPath"
+        - $ref: "#/components/parameters/UserIdHeader"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PostCreate'
+              $ref: "#/components/schemas/PostCreate"
       responses:
-        '200':
+        "200":
           description: >
             Повторный запрос с тем же `X-Request-Id` и содержимым: возвращён уже созданный пост
             (идемпотентный ответ).
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Post'
-        '201':
+                $ref: "#/components/schemas/Post"
+        "201":
           description: Пост создан.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Post'
-        '400':
-          $ref: '#/components/responses/ErrorBadRequest'
-        '401':
-          $ref: '#/components/responses/ErrorUnauthorized'
-        '403':
+                $ref: "#/components/schemas/Post"
+        "400":
+          $ref: "#/components/responses/ErrorBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrorUnauthorized"
+        "403":
           description: Нельзя добавлять посты в закрытый тред
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
               example:
                 code: thread_locked
                 message: Нельзя добавлять посты в закрытый тред
-        '404':
-          $ref: '#/components/responses/ErrorNotFound'
-        '409':
+        "404":
+          $ref: "#/components/responses/ErrorNotFound"
+        "409":
           description: >
             Конфликт идемпотентности: `X-Request-Id` уже использовался,
             но параметры запроса отличаются (например, другое тело ThreadCreate).
-          $ref: '#/components/responses/ErrorConflict'
-        '500':
-          $ref: '#/components/responses/ErrorInternal'
+          $ref: "#/components/responses/ErrorConflict"
+        "500":
+          $ref: "#/components/responses/ErrorInternal"
 
   /api/v1/threads/{thread_id}/attachments:
     post:
@@ -1052,29 +1051,29 @@ paths:
       security:
         - user_id_auth: []
       parameters:
-        - $ref: '#/components/parameters/ThreadIdPath'
-        - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: "#/components/parameters/ThreadIdPath"
+        - $ref: "#/components/parameters/UserIdHeader"
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/UploadAttachmentRequest'
+              $ref: "#/components/schemas/UploadAttachmentRequest"
       responses:
-        '201':
+        "201":
           description: Вложение создано.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Attachment'
-        '400':
-          $ref: '#/components/responses/ErrorBadRequest'
-        '401':
-          $ref: '#/components/responses/ErrorUnauthorized'
-        '404':
-          $ref: '#/components/responses/ErrorNotFound'
-        '500':
-          $ref: '#/components/responses/ErrorInternal'
+                $ref: "#/components/schemas/Attachment"
+        "400":
+          $ref: "#/components/responses/ErrorBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrorUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrorNotFound"
+        "500":
+          $ref: "#/components/responses/ErrorInternal"
 
   /api/v1/attachments/{attachment_id}:
     get:
@@ -1088,18 +1087,18 @@ paths:
         - демонстрирует модель `Attachment`.
       operationId: get_attachment
       parameters:
-        - $ref: '#/components/parameters/AttachmentIdPath'
+        - $ref: "#/components/parameters/AttachmentIdPath"
       responses:
-        '200':
+        "200":
           description: Метаданные вложения.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Attachment'
-        '404':
-          $ref: '#/components/responses/ErrorNotFound'
-        '500':
-          $ref: '#/components/responses/ErrorInternal'
+                $ref: "#/components/schemas/Attachment"
+        "404":
+          $ref: "#/components/responses/ErrorNotFound"
+        "500":
+          $ref: "#/components/responses/ErrorInternal"
 
   /api/v1/attachments/{attachment_id}/file:
     get:
@@ -1115,19 +1114,19 @@ paths:
         - можно использовать для тренировки установки корректного `Content-Type`.
       operationId: download_attachment_file
       parameters:
-        - $ref: '#/components/parameters/AttachmentIdPath'
+        - $ref: "#/components/parameters/AttachmentIdPath"
       responses:
-        '200':
+        "200":
           description: Файл вложения.
           content:
             image/*:
               schema:
                 type: string
                 format: binary
-        '404':
-          $ref: '#/components/responses/ErrorNotFound'
-        '500':
-          $ref: '#/components/responses/ErrorInternal'
+        "404":
+          $ref: "#/components/responses/ErrorNotFound"
+        "500":
+          $ref: "#/components/responses/ErrorInternal"
 
   /api/v1/search:
     get:
@@ -1139,7 +1138,7 @@ paths:
         - использует query-параметр `search_query` (строка поиска),
 
         - параметр type задаёт тип сущности для фильтрации (`thread`/`post`/`all`),
-        
+
         - в ответе используется **oneOf** (`ThreadSearchResult` или `PostSearchResult`),
           что позволяет отработать разбор гетерогенных JSON-объектов.
       operationId: search
@@ -1164,13 +1163,13 @@ paths:
             enum: [thread, post, all]
             default: all
       responses:
-        '200':
+        "200":
           description: Результаты поиска.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SearchResponse'
-        '400':
-          $ref: '#/components/responses/ErrorBadRequest'
-        '500':
-          $ref: '#/components/responses/ErrorInternal'
+                $ref: "#/components/schemas/SearchResponse"
+        "400":
+          $ref: "#/components/responses/ErrorBadRequest"
+        "500":
+          $ref: "#/components/responses/ErrorInternal"

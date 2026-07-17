@@ -14,6 +14,7 @@ import (
 	forum "stepik.leoscode.http/internal/gen/api"
 )
 
+// Сервис для работы с тредами
 type ThreadService struct {
 	threads         map[int64]forum.Thread
 	nextID          int64
@@ -202,12 +203,109 @@ func hashRequestBody(req forum.ThreadCreate) string {
 	return hex.EncodeToString(hash[:])
 }
 
-func (t *ThreadService) GetThreadByID(thread_id string) (*forum.Thread, error) {
+func (t *ThreadService) FindThreadByID(thread_id string) (forum.Thread, error) {
 	threadIdInt, _ := strconv.ParseInt(thread_id, 10, 64)
-	for _, t := range t.threads {
-		if t.Id == threadIdInt {
-			return &t, nil
+	if thread, ok := t.threads[threadIdInt]; ok {
+		return thread, nil
+	}
+	return forum.Thread{}, errors.New("thread not found")
+}
+
+func (t *ThreadService) UpdateAllThread(user_id openapi_types.UUID, thread_id string, req forum.ThreadCreate) (forum.Thread, error) {
+	threadIdInt, _ := strconv.ParseInt(thread_id, 10, 64)
+
+	if entry, ok := t.threads[threadIdInt]; ok {
+		if entry.AuthorId != user_id {
+			return forum.Thread{}, errors.New("Несоответствие пользователей")
+		}
+		now := time.Now()
+		entry.Title = req.Title
+		entry.Content = req.Content
+		entry.Tags = req.Tags
+		entry.UpdatedAt = &now
+
+		t.threads[threadIdInt] = entry
+
+		return entry, nil
+	}
+	return forum.Thread{}, errors.New("thread not found")
+}
+
+func (t *ThreadService) UpdateThreadPatch(user_id openapi_types.UUID, thread_id string, req forum.ThreadPatch) (forum.Thread, error) {
+	threadIDInt, err := strconv.ParseInt(thread_id, 10, 64)
+	if err != nil {
+		return forum.Thread{}, fmt.Errorf("неверный thread_id", err)
+	}
+
+	// Проверяем существование треда
+	entry, exists := t.threads[threadIDInt]
+	if !exists {
+		return forum.Thread{}, errors.New("thread not found")
+	}
+
+	// Проверяем права доступа
+	if entry.AuthorId != user_id {
+		return forum.Thread{}, errors.New("user mismatch: cannot modify another user's thread")
+	}
+
+	// Проверяем, не заблокирован ли тред
+	if entry.IsLocked {
+		return forum.Thread{}, errors.New("thread is locked and cannot be modified")
+	}
+
+	// Проверяем, что в запросе есть хотя бы одно поле для обновления
+	hasChanges := false
+
+	// Пробуем распарсить каждый тип патча
+	if patch0, err := req.AsThreadPatch0(); err == nil {
+		if patch0.Title != "" {
+			entry.Title = patch0.Title
+			hasChanges = true
 		}
 	}
-	return nil, errors.New("thread not found")
+
+	if patch1, err := req.AsThreadPatch1(); err == nil {
+		if patch1.Content != "" {
+			entry.Content = patch1.Content
+			hasChanges = true
+		}
+	}
+
+	if patch2, err := req.AsThreadPatch2(); err == nil {
+		// ВАЖНО: tags может быть пустым массивом (очистка тегов)
+		if len(patch2.Tags) >= 0 { // разрешаем пустой массив
+			entry.Tags = &patch2.Tags
+			hasChanges = true
+		}
+	}
+
+	if patch3, err := req.AsThreadPatch3(); err == nil {
+		// ВАЖНО: может быть false, поэтому проверяем что поле установлено
+		entry.IsLocked = patch3.IsLocked
+		hasChanges = true
+	}
+
+	// Если ничего не изменилось - возвращаем ошибку
+	if !hasChanges {
+		return forum.Thread{}, errors.New("no valid fields to update")
+	}
+
+	now := time.Now()
+	entry.UpdatedAt = &now
+
+	t.threads[threadIDInt] = entry
+
+	return entry, nil
+
+}
+
+func (t *ThreadService) DeleteThread(thread_id string) error {
+	threadIDInt, err := strconv.ParseInt(thread_id, 10, 64)
+	if err != nil {
+		return fmt.Errorf("неверный thread_id", err)
+	}
+
+	
+
+	return nil
 }

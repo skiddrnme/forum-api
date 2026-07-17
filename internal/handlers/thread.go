@@ -71,7 +71,7 @@ func (t *ThreadHandler) GetThreadByID(c *gin.Context){
 	// Получаем thread_id из path параметров
 	id := c.Param("thread_id")
 
-	thread, err := t.threadService.GetThreadByID(id)
+	thread, err := t.threadService.FindThreadByID(id)
 	if err != nil{
 		c.JSON(http.StatusNotFound, gin.H{
 			"code": "not_found",
@@ -80,10 +80,116 @@ func (t *ThreadHandler) GetThreadByID(c *gin.Context){
 		return
 	}
 
+	// Дописать еще одну ошибку (error internal server)
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Тред найден",
 		"item": thread,
 	})
+}
+
+func (t *ThreadHandler) UpdateAll(c *gin.Context){
+
+	userID := c.GetHeader("X-User-Id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"code":    "unauthorized",
+			"message": "User ID не найден",
+		})
+		return
+	}
+	parseUUID, err := uuid.Parse(userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    "bad_request",
+			"message": "Неверный формат User ID",
+		})
+		return
+	}
+
+	threadID := c.Param("thread_id")
+
+	var req forum.ThreadCreate
+
+	// Парсим тело запроса
+	if err := c.ShouldBindJSON(&req); err != nil{
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    "bad_request",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	// Валидация обязательных полей
+	if req.Title == "" || req.Content == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    "validation_error",
+			"message": "Title и Content обязательны",
+		})
+		return
+	}
+
+	thread, err := t.threadService.UpdateAllThread(parseUUID, threadID, req)
+	if err != nil{
+		// 500 Internal Error
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    "internal_error",
+			"message": err.Error(),
+		})
+		return
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Тред заменен",
+		"thread": thread,
+	})
+
+}
+
+func (t *ThreadHandler) UpdatePatch(c *gin.Context){
+	userID := c.GetHeader("X-User-Id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"code":    "unauthorized",
+			"message": "User ID не найден",
+		})
+		return
+	}
+	parseUUID, err := uuid.Parse(userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    "bad_request",
+			"message": "Неверный формат User ID",
+		})
+		return
+	}
+	threadID := c.Param("thread_id")
+
+	var req forum.ThreadPatch
+	if err := c.ShouldBindJSON(&req); err != nil{
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    "bad_request",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	thread, err := t.threadService.UpdateThreadPatch(parseUUID, threadID, req)
+	if err != nil{
+		// 500 Internal Error
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    "internal_error",
+			"message": err.Error(),
+		})
+		return
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Тред обновлен",
+		"thread": thread,
+	})
+
+
 }
 
 
