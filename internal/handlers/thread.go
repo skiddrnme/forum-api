@@ -271,3 +271,36 @@ func (t *ThreadHandler) Create(c *gin.Context) {
 
 	c.JSON(statusCode, thread)
 }
+
+
+func (t *ThreadHandler) DeleteThread(c *gin.Context){
+	userID := c.GetHeader("X-User-Id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"code":    "unauthorized",
+			"message": "User ID не найден",
+		})
+		return
+	}
+	parseUUID, err := uuid.Parse(userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    "bad_request",
+			"message": "Неверный формат User ID",
+		})
+		return
+	}
+
+	threadID := c.Param("thread_id")
+
+	if err := t.threadService.DeleteThread(parseUUID, threadID); err != nil{
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    "bad_request",
+			"message": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Тред удален",
+	})
+}

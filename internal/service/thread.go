@@ -299,13 +299,26 @@ func (t *ThreadService) UpdateThreadPatch(user_id openapi_types.UUID, thread_id 
 
 }
 
-func (t *ThreadService) DeleteThread(thread_id string) error {
+func (t *ThreadService) DeleteThread(user_id openapi_types.UUID, thread_id string) error {
 	threadIDInt, err := strconv.ParseInt(thread_id, 10, 64)
 	if err != nil {
-		return fmt.Errorf("неверный thread_id", err)
+		return fmt.Errorf("неверный thread_id: %w", err)
 	}
 
-	
+	thread, ok := t.threads[threadIDInt]
+	if !ok{
+		return fmt.Errorf("thread with id %d not found", threadIDInt)
+	}
+
+	if thread.AuthorId != user_id{
+		return errors.New("forbidden: only the author can delete the thread")
+	}
+
+	if thread.IsLocked {
+		return errors.New("thread_locked: cannot delete a locked thread")
+	}
+
+	delete(t.threads, threadIDInt)
 
 	return nil
 }
