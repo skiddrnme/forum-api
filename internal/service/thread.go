@@ -1,80 +1,53 @@
 package service
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"slices"
 	"sort"
 	"strconv"
+	"sync"
 	"time"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	forum "stepik.leoscode.http/internal/gen/api"
+	"stepik.leoscode.http/internal/utils"
 )
 
 // Сервис для работы с тредами
 type ThreadService struct {
 	threads         map[int64]forum.Thread
 	nextID          int64
-	idempotencyKeys map[string]IdempotencyRecord
-}
-
-type IdempotencyRecord struct {
-	Thread      forum.Thread
-	CreatedAt   time.Time
-	RequestBody string // Хеш тела запроса для проверки конфликта
-	UserID      string
+	mu             sync.RWMutex
+	idempotencyStore *TypedIdempotencyStore[forum.Thread] // Типизированное хранилище для Thread
 }
 
 func NewThreadService() *ThreadService {
 	return &ThreadService{
 		threads:         make(map[int64]forum.Thread),
 		nextID:          1,
-		idempotencyKeys: make(map[string]IdempotencyRecord),
+		idempotencyStore: NewTypedIdempotencyStore[forum.Thread](24 * time.Hour),
 	}
 }
 
 func (t *ThreadService) GetThreads(limit int, offset int, tag string, authorID string) ([]forum.Thread, error) {
-	var result []forum.Thread
-
-	for _, thread := range t.threads {
-		match := true
-		if authorID != "" {
-			if thread.AuthorId.String() != authorID {
-				match = false
-			}
-		}
-		if !hasTag(thread, tag) {
-			match = false
-		}
-
-		if !match {
-			continue
-		}
-		result = append(result, thread)
-	}
-
-	// Сортировка по дате создания (новые сверху)
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].CreatedAt.After(result[j].CreatedAt)
-	})
-
-	// Пагинация
-	if limit == 0 {
-		limit = 20 // дефолтное значение по спецификации
-	}
-	if offset < 0 {
-		offset = 0
-	}
-
-	if limit > 100 {
-		limit = 100
-	}
-
-	items := paginate(result, offset, limit)
-	return items, nil
+	 var result []forum.Thread
+    for _, thread := range t.threads {
+        if !t.matchesFilters(thread, tag, authorID) {
+            continue
+        }
+        result = append(result, thread)
+    }
+    
+    // Сортировка по дате (новые сверху)
+    sort.Slice(result, func(i, j int) bool {
+        return result[i].CreatedAt.After(result[j].CreatedAt)
+    })
+    
+    // Пагинация
+    paginated := utils.ApplyPaginateWithDefault(result, limit, offset)
+    
+    return paginated, nil
 }
 
 func (t *ThreadService) GetThreadsWithMeta(limit int, offset int, tag string, authorID string) (forum.ThreadListResponse, error) {
@@ -98,22 +71,27 @@ func (t *ThreadService) GetThreadsWithMeta(limit int, offset int, tag string, au
 
 func (t *ThreadService) countThreads(tag string, authorID string) int {
 	count := 0
-	for _, thread := range t.threads {
-		match := true
+    for _, thread := range t.threads {
+        if t.matchesFilters(thread, tag, authorID) {
+            count++
+        }
+    }
+    return count
+}
 
-		if authorID != "" && thread.AuthorId.String() != authorID {
-			match = false
-		}
-
-		if match && tag != "" && !hasTag(thread, tag) {
-			match = false
-		}
-
-		if match {
-			count++
-		}
-	}
-	return count
+// matchesFilters проверяет соответствие фильтрам
+func (t *ThreadService) matchesFilters(thread forum.Thread, tag string, authorID string) bool {
+    // Проверка автора
+    if authorID != "" && thread.AuthorId.String() != authorID {
+        return false
+    }
+    
+    // Проверка тега
+    if tag != "" && !hasTag(thread, tag) {
+        return false
+    }
+    
+    return true
 }
 
 func hasTag(thread forum.Thread, tag string) bool {
@@ -128,55 +106,47 @@ func hasTag(thread forum.Thread, tag string) bool {
 	return false
 }
 
-// Ютилка для пагинации тредов
-func paginate(threads []forum.Thread, offset, limit int) []forum.Thread {
-	if offset > len(threads) || offset < 0 {
-		return []forum.Thread{}
-	}
+// CreateThread создает новый тред с поддержкой идемпотентности
+func (t *ThreadService) CreateThread(
+	userID openapi_types.UUID,
+	req forum.ThreadCreate,
+	idempotencyKey string,
+) (forum.Thread, bool, bool, error) {
+	
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
-	start := offset
-	end := offset + limit
-	if end > len(threads) {
-		end = len(threads)
-	}
-
-	return threads[start:end]
-}
-
-// Create возвращает (thread, isCached, conflict, error)
-func (t *ThreadService) Create(userID openapi_types.UUID, req forum.ThreadCreate, idempotencyKey string) (forum.Thread, bool, bool, error) {
-
+	// Если ключа нет - создаем как обычно
 	if idempotencyKey == "" {
-		// Если ключа нет - создаем как обычно (хотя по спецификации он обязателен)
-		return t.createNewThread(userID, req), false, false, nil
+		thread := t.createNewThread(userID, req)
+		return thread, false, false, nil
 	}
 
-	if record, exists := t.idempotencyKeys[idempotencyKey]; exists {
+	// Проверяем идемпотентность
+	if record, exists := t.idempotencyStore.GetFullRecord(idempotencyKey); exists {
 		// Проверяем, что это тот же пользователь
 		if record.UserID != userID.String() {
 			return forum.Thread{}, false, false, errors.New("user mismatch")
 		}
 
 		// Проверяем, совпадает ли тело запроса
-		currentHash := hashRequestBody(req)
+		currentHash := HashRequestBody(req)
 		if record.RequestBody != currentHash {
 			// Тело отличается - конфликт!
 			return forum.Thread{}, false, true, errors.New("conflict: different request body")
 		}
 
 		// Все совпадает - возвращаем кэшированный результат
-		return record.Thread, true, false, nil
+		return record.Result, true, false, nil
 	}
+
 	// Новый запрос - создаем тред
 	thread := t.createNewThread(userID, req)
 
-	// Сохраняем в кэш
-	t.idempotencyKeys[idempotencyKey] = IdempotencyRecord{
-		Thread:      thread,
-		CreatedAt:   time.Now(),
-		RequestBody: hashRequestBody(req),
-		UserID:      userID.String(),
-	}
+	// Сохраняем в идемпотентное хранилище
+	hash := HashRequestBody(req)
+	t.idempotencyStore.Set(idempotencyKey, userID.String(), thread, hash)
+	
 	return thread, false, false, nil
 }
 
@@ -194,13 +164,6 @@ func (t *ThreadService) createNewThread(userID openapi_types.UUID, req forum.Thr
 	t.threads[thread.Id] = thread
 	t.nextID++
 	return thread
-}
-
-// создает хеш тела запроса для проверки конфликтов
-func hashRequestBody(req forum.ThreadCreate) string {
-	data := fmt.Sprintf("%s|%s|%v", req.Title, req.Content, req.Tags)
-	hash := sha256.Sum256([]byte(data))
-	return hex.EncodeToString(hash[:])
 }
 
 func (t *ThreadService) FindThreadByID(thread_id string) (forum.Thread, error) {

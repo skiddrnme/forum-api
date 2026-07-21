@@ -193,7 +193,7 @@ func (t *ThreadHandler) UpdatePatch(c *gin.Context){
 }
 
 
-func (t *ThreadHandler) Create(c *gin.Context) {
+func (t *ThreadHandler) CreateThread(c *gin.Context) {
 	// 1. Получаем userID
 	userID := c.GetHeader("X-User-Id")
 	if userID == "" {
@@ -243,7 +243,7 @@ func (t *ThreadHandler) Create(c *gin.Context) {
 
 	// 5. Создаем тред с идемпотентностью
 
-	thread, wasCached, conflict, err := t.threadService.Create(parseUUID, req, idempotencyKey)
+	thread, wasCached, conflict, err := t.threadService.CreateThread(parseUUID, req, idempotencyKey)
 	if err != nil {
 		if conflict {
 			// 409 Conflict - тело запроса отличается
