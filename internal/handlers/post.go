@@ -14,13 +14,13 @@ type PostHandler struct {
 	postService *service.PostService
 }
 
-func (p *PostHandler) NewPostHandler(postService *service.PostService) *PostHandler{
+func NewPostHandler(postService *service.PostService) *PostHandler {
 	return &PostHandler{
 		postService: postService,
 	}
 }
 
-func (p *PostHandler) GetPosts(c *gin.Context){
+func (p *PostHandler) GetPosts(c *gin.Context) {
 	limitStr := c.DefaultQuery("limit", "20")
 	offsetStr := c.DefaultQuery("offset", "0")
 
@@ -42,21 +42,10 @@ func (p *PostHandler) GetPosts(c *gin.Context){
 		return
 	}
 
-	thread_id := c.Query("thread_id")
-	author_id := c.Query("author_id")
-
-	if author_id != ""{
-		if _, err := uuid.Parse(author_id); err != nil{
-			c.JSON(http.StatusBadRequest, gin.H{
-				"code":    "validation_error",
-				"message": "invalid author_id format",
-			})
-			return
-		}
-	}
+	thread_id := c.Param("thread_id")
 
 	posts, err := p.postService.GetPostsWithMeta(thread_id, limit, offset)
-	if err != nil{
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    "internal_server",
 			"message": err.Error(),
@@ -67,9 +56,9 @@ func (p *PostHandler) GetPosts(c *gin.Context){
 	c.JSON(http.StatusOK, posts)
 }
 
-func (p *PostHandler) CreatePost(c *gin.Context){
+func (p *PostHandler) CreatePost(c *gin.Context) {
 	userID := c.GetHeader("X-User-Id")
-	if userID == ""{
+	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"code":    "unauthorized",
 			"message": "User ID не найден",
@@ -95,7 +84,7 @@ func (p *PostHandler) CreatePost(c *gin.Context){
 	}
 
 	var req forum.PostCreate
-	if err := c.ShouldBindJSON(&req); err != nil{
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    "bad_request",
 			"message": err.Error(),
@@ -103,7 +92,7 @@ func (p *PostHandler) CreatePost(c *gin.Context){
 		return
 	}
 
-	if req.Content == ""{
+	if req.Content == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    "validation_error",
 			"message": "Content обязательны",
@@ -114,8 +103,8 @@ func (p *PostHandler) CreatePost(c *gin.Context){
 	thread_id := c.Query("thread_id")
 
 	post, wasCached, conflict, err := p.postService.CreatePost(thread_id, parseUUID, req, idempotencyKey)
-	if err != nil{
-		if conflict{
+	if err != nil {
+		if conflict {
 			// 409 Conflict - тело запроса отличается
 			c.JSON(http.StatusConflict, gin.H{
 				"code":    "bad_request",

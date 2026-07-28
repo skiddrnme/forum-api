@@ -31,10 +31,10 @@ func NewTypedIdempotencyStore[T any](ttl time.Duration) *TypedIdempotencyStore[T
 		records: make(map[string]TypedIdempotencyRecord[T]),
 		ttl:     ttl,
 	}
-	
+
 	// Запускаем фоновую очистку
 	go store.cleanupWorker()
-	
+
 	return store
 }
 
@@ -42,7 +42,7 @@ func NewTypedIdempotencyStore[T any](ttl time.Duration) *TypedIdempotencyStore[T
 func (s *TypedIdempotencyStore[T]) Set(key string, userID string, result T, requestBody string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	s.records[key] = TypedIdempotencyRecord[T]{
 		Result:      result,
 		CreatedAt:   time.Now(),
@@ -56,18 +56,18 @@ func (s *TypedIdempotencyStore[T]) Set(key string, userID string, result T, requ
 func (s *TypedIdempotencyStore[T]) Get(key string) (T, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	var zero T
 	record, exists := s.records[key]
 	if !exists {
 		return zero, false
 	}
-	
+
 	// Проверяем TTL
 	if time.Since(record.CreatedAt) > record.TTL {
 		return zero, false
 	}
-	
+
 	return record.Result, true
 }
 
@@ -75,17 +75,17 @@ func (s *TypedIdempotencyStore[T]) Get(key string) (T, bool) {
 func (s *TypedIdempotencyStore[T]) GetFullRecord(key string) (TypedIdempotencyRecord[T], bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	record, exists := s.records[key]
 	if !exists {
 		return TypedIdempotencyRecord[T]{}, false
 	}
-	
+
 	// Проверяем TTL
 	if time.Since(record.CreatedAt) > record.TTL {
 		return TypedIdempotencyRecord[T]{}, false
 	}
-	
+
 	return record, true
 }
 
@@ -100,7 +100,7 @@ func (s *TypedIdempotencyStore[T]) Delete(key string) {
 func (s *TypedIdempotencyStore[T]) cleanupWorker() {
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		s.cleanup()
 	}
@@ -110,7 +110,7 @@ func (s *TypedIdempotencyStore[T]) cleanupWorker() {
 func (s *TypedIdempotencyStore[T]) cleanup() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	now := time.Now()
 	for key, record := range s.records {
 		if now.Sub(record.CreatedAt) > record.TTL {

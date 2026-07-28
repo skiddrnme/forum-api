@@ -15,9 +15,12 @@ func main() {
 	threadService := service.NewThreadService()
 	threadHandler := handlers.NewThreadHandler(threadService)
 
+	postService := service.NewPostService()
+	postHandler := handlers.NewPostHandler(postService)
 
 	r.GET("/internal/v1/health", handlers.Health)
 
+	// Треды
 	r.GET("/api/v1/threads", threadHandler.GetThreads)
 	r.GET("/api/v1/threads/:thread_id", threadHandler.GetThreadByID)
 	
@@ -30,6 +33,12 @@ func main() {
 	r.DELETE("/api/v1/threads/:thread_id", threadHandler.DeleteThread)
 
 	r.POST("/api/v1/auth/login", authHandler.Login)
+
+	// Посты
+	r.GET("/api/v1/threads/:thread_id/posts", postHandler.GetPosts)
+
+	r.POST("/api/v1/threads/:thread_id/posts", postHandler.CreatePost)
+
 
 	r.Run(":8080")
 }

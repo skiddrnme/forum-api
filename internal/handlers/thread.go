@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -67,14 +68,14 @@ func (t *ThreadHandler) GetThreads(c *gin.Context) {
 	c.JSON(http.StatusOK, threads)
 }
 
-func (t *ThreadHandler) GetThreadByID(c *gin.Context){
+func (t *ThreadHandler) GetThreadByID(c *gin.Context) {
 	// Получаем thread_id из path параметров
 	id := c.Param("thread_id")
 
 	thread, err := t.threadService.FindThreadByID(id)
-	if err != nil{
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"code": "not_found",
+			"code":    "not_found",
 			"message": err.Error(),
 		})
 		return
@@ -82,13 +83,10 @@ func (t *ThreadHandler) GetThreadByID(c *gin.Context){
 
 	// Дописать еще одну ошибку (error internal server)
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Тред найден",
-		"item": thread,
-	})
+	c.JSON(http.StatusOK, thread)
 }
 
-func (t *ThreadHandler) UpdateAll(c *gin.Context){
+func (t *ThreadHandler) UpdateAll(c *gin.Context) {
 
 	userID := c.GetHeader("X-User-Id")
 	if userID == "" {
@@ -112,7 +110,7 @@ func (t *ThreadHandler) UpdateAll(c *gin.Context){
 	var req forum.ThreadCreate
 
 	// Парсим тело запроса
-	if err := c.ShouldBindJSON(&req); err != nil{
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    "bad_request",
 			"message": err.Error(),
@@ -120,33 +118,71 @@ func (t *ThreadHandler) UpdateAll(c *gin.Context){
 		return
 	}
 
-	// Валидация обязательных полей
-	if req.Title == "" || req.Content == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    "validation_error",
-			"message": "Title и Content обязательны",
+	// 4. Вызываем сервис
+	thread, err := t.threadService.UpdateAllThread(parseUUID, threadID, req)
+	if err != nil {
+		// ✅ ВАЖНО: обрабатываем разные типы ошибок!
+		errMsg := err.Error()
+
+		// Проверяем ошибки валидации → 400 Bad Request
+		if strings.Contains(errMsg, "validation_error") ||
+			strings.Contains(errMsg, "title must be between") ||
+			strings.Contains(errMsg, "content must be between") ||
+			strings.Contains(errMsg, "too many tags") ||
+			strings.Contains(errMsg, "tag at position") ||
+			strings.Contains(errMsg, "cannot be empty") ||
+			strings.Contains(errMsg, "cannot be only spaces") {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"code":    "validation_error",
+				"message": errMsg,
+			})
+			return
+		}
+
+		// Проверяем ошибку "not found" → 404
+		if strings.Contains(errMsg, "thread not found") {
+			c.JSON(http.StatusNotFound, gin.H{
+				"code":    "not_found",
+				"message": errMsg,
+			})
+			return
+		}
+
+		// Проверяем ошибку "user mismatch" → 403
+		if strings.Contains(errMsg, "user mismatch") || strings.Contains(errMsg, "Несоответствие пользователей") {
+			c.JSON(http.StatusForbidden, gin.H{
+				"code":    "forbidden",
+				"message": errMsg,
+			})
+			return
+		}
+
+		// Проверяем ошибку "locked" → 403
+		if strings.Contains(errMsg, "locked") || strings.Contains(errMsg, "заблокирован") {
+			c.JSON(http.StatusForbidden, gin.H{
+				"code":    "thread_locked",
+				"message": errMsg,
+			})
+			return
+		}
+
+		// Неизвестная ошибка → 500
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    "internal_error",
+			"message": "internal server error",
 		})
 		return
 	}
 
-	thread, err := t.threadService.UpdateAllThread(parseUUID, threadID, req)
-	if err != nil{
-		// 500 Internal Error
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    "internal_error",
-			"message": err.Error(),
-		})
-		return
-	}
-	
+	// 5. Успешный ответ
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Тред заменен",
-		"thread": thread,
+		"thread":  thread,
 	})
 
 }
 
-func (t *ThreadHandler) UpdatePatch(c *gin.Context){
+func (t *ThreadHandler) UpdatePatch(c *gin.Context) {
 	userID := c.GetHeader("X-User-Id")
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -164,34 +200,62 @@ func (t *ThreadHandler) UpdatePatch(c *gin.Context){
 		return
 	}
 	threadID := c.Param("thread_id")
+	if threadID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    "validation error",
+			"message": "thread_id is required",
+		})
+		return
+	}
 
 	var req forum.ThreadPatch
-	if err := c.ShouldBindJSON(&req); err != nil{
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    "bad_request",
-			"message": err.Error(),
+			"message": "invalid JSON body",
 		})
 		return
 	}
 
 	thread, err := t.threadService.UpdateThreadPatch(parseUUID, threadID, req)
-	if err != nil{
-		// 500 Internal Error
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    "internal_error",
-			"message": err.Error(),
-		})
+	if err != nil {
+		switch {
+		case strings.Contains(err.Error(), "thread not found"):
+			c.JSON(http.StatusNotFound, gin.H{
+				"code":    "not_found",
+				"message": err.Error(),
+			})
+		case strings.Contains(err.Error(), "forbidden") || strings.Contains(err.Error(), "user mismatch"):
+			c.JSON(http.StatusForbidden, gin.H{
+				"code":    "forbidden",
+				"message": err.Error(),
+			})
+		case strings.Contains(err.Error(), "locked"):
+			c.JSON(http.StatusForbidden, gin.H{
+				"code":    "thread_locked",
+				"message": err.Error(),
+			})
+		case strings.Contains(err.Error(), "invalid thread_id") || strings.Contains(err.Error(), "no valid fields"):
+			c.JSON(http.StatusBadRequest, gin.H{
+				"code":    "validation_error",
+				"message": err.Error(),
+			})
+		default:
+			// Неизвестная ошибка - 500
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code":    "internal_error",
+				"message": "an unexpected error occurred",
+			})
+		}
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Тред обновлен",
-		"thread": thread,
+		"thread":  thread,
 	})
 
-
 }
-
 
 func (t *ThreadHandler) CreateThread(c *gin.Context) {
 	// 1. Получаем userID
@@ -272,8 +336,7 @@ func (t *ThreadHandler) CreateThread(c *gin.Context) {
 	c.JSON(statusCode, thread)
 }
 
-
-func (t *ThreadHandler) DeleteThread(c *gin.Context){
+func (t *ThreadHandler) DeleteThread(c *gin.Context) {
 	userID := c.GetHeader("X-User-Id")
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -293,7 +356,7 @@ func (t *ThreadHandler) DeleteThread(c *gin.Context){
 
 	threadID := c.Param("thread_id")
 
-	if err := t.threadService.DeleteThread(parseUUID, threadID); err != nil{
+	if err := t.threadService.DeleteThread(parseUUID, threadID); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    "bad_request",
 			"message": err.Error(),
