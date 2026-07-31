@@ -351,3 +351,6 @@ func (t *ThreadService) DeleteThread(user_id openapi_types.UUID, thread_id strin
 
 	return nil
 }
+
+
+
