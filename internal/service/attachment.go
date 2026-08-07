@@ -3,10 +3,12 @@ package service
 import (
 	"errors"
 	"fmt"
+	"mime/multipart"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	forum "stepik.leoscode.http/internal/gen/api"
 )
@@ -24,7 +26,7 @@ func NewAttachmentService(threadService *ThreadService) *AttachmentService {
 	}
 }
 
-func (a *AttachmentService) UploadAttachment(threadID string, userID openapi_types.UUID, file string, size int64, mimeType forum.AttachmentMimeType) (forum.Attachment, error) {
+func (a *AttachmentService) UploadAttachment(threadID string, userID openapi_types.UUID, file multipart.File, header *multipart.FileHeader) (forum.Attachment, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -40,20 +42,31 @@ func (a *AttachmentService) UploadAttachment(threadID string, userID openapi_typ
 		return forum.Attachment{}, errors.New("user mismatch: cannot modify another user's thread")
 	}
 
-	attachment := a.createNewAttachment(file, threadIDInt, size, mimeType)
+	filename := header.Filename
+
+	attachment := a.createNewAttachment(filename, threadIDInt, header) 
 	a.attachments[attachment.Id] = attachment
 
 	return attachment, nil
 }
 
-func (a *AttachmentService) createNewAttachment(filename string, threadID int64, size int64, mimeType forum.AttachmentMimeType) forum.Attachment {
+func (a *AttachmentService) createNewAttachment(filename string, threadID int64, header *multipart.FileHeader) forum.Attachment {
 	attachment := forum.Attachment{
+		Id: openapi_types.UUID(uuid.New()),
 		CreatedAt: time.Now(),
 		Filename:  filename,
-		MimeType:  mimeType,
-		Size:      size,
+		MimeType:  forum.AttachmentMimeType(header.Header.Get("Content-Type")),
+		Size:      header.Size,
 		ThreadId:  threadID,
 		Url:       nil,
 	}
 	return attachment
+}
+
+func (a *AttachmentService) GetAttachmentMeta(attachment_id openapi_types.UUID) (forum.Attachment, error){
+	attachment, ok := a.attachments[attachment_id]
+	if !ok{
+		return forum.Attachment{}, errors.New("attachment not found")
+	}
+	return attachment, nil
 }
